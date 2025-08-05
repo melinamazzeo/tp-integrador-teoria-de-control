@@ -6,13 +6,13 @@ from controlador import ThermostatSim as ctrl
 
 # Parametros iniciales del simulador
 defaults = {
-    't_amb':      25.0, # De la casa en °C
+    't_init':      25.0, # De la casa en °C
     't_pert':      0.0, # Perturbacion inicial en °C
-    'coef_amb':    0.002, # Influencia del entorno sobre el sistema °C / seg
+    'coef_pert':    0.002, # Influencia del entorno sobre el sistema °C / seg
     'delta_max':   0.07,  # Maximo de influencia de temp ambiente a aplicar por iteración °C / min (ajustado para demostracion)
     'vol_room':    3*3*2.9, # m³
     'actuadores_on': True, # Actuadores habilitados
-    'pot_heat':    120, # W (J/s)
+    'pot_heat':    2000, # W (J/s)
     'pot_cool':    2000, # W
     'eff_heat':    0.95, # Eficiencia del sistema de calefaccion
     'eff_cool':    0.75, # Eficiencia del sistema de refrigeracion
@@ -31,11 +31,11 @@ fig, (ax_temp, ax_pert, ax_error) = plt.subplots(3, 1, figsize=(10, 6), sharex=T
 plt.subplots_adjust(bottom=0.3)
 
 line_theta_o, = ax_temp.plot([], [], label="\u03F4o", color="green")
-line_theta_i,  = ax_temp.plot([], [], label="\u03F4i", color="orange", linestyle="--", alpha=0.8)
+line_theta_i, = ax_temp.plot([], [], label="Temp Deseada (\u03F4i)", color="orange", linestyle="--")
 ax_tlow_line = ax_temp.axhline(
-    defaults['t_low'],  color='blue',  linestyle='--')
+    defaults['t_low'], label="Umbral min.", color='blue',  linestyle='--')
 ax_thigh_line = ax_temp.axhline(
-    defaults['t_high'], color='red',   linestyle='--')
+    defaults['t_high'], label="Umbral max.", color='red',   linestyle='--')
 ax_temp.set_ylabel("°C")
 ax_temp.grid()
 leg_temp = ax_temp.legend(loc='upper left')
@@ -59,7 +59,7 @@ def init_limits(ax, y0, x0=0, y_margin=1):
     ax.set_xlim(ax.min_xlim, ax.max_xlim)
     ax.set_ylim(ax.min_ylim, ax.max_ylim)
 
-init_limits(ax_temp, defaults['t_amb'], y_margin=1)
+init_limits(ax_temp, defaults['t_init'], y_margin=1)
 init_limits(ax_pert, defaults['t_pert'], y_margin=0.5)
 init_limits(ax_error, 0.0, y_margin=0.2)
 
@@ -78,9 +78,9 @@ slider_axes = [
     plt.axes([0.20, 0.08, 0.7, 0.03], facecolor='lightgoldenrodyellow'),
     plt.axes([0.20, 0.17, 0.7, 0.03], facecolor='lightgoldenrodyellow'),
 ]
-sld_t_amb = Slider(slider_axes[0], "Temp. Ambiente (\u03F4i)", 0.0, 40, valinit=defaults['t_amb'], valstep=0.5)
+sld_t_init = Slider(slider_axes[0], "Temp. Inicial", 0.0, 40, valinit=defaults['t_init'], valstep=0.5)
 sld_t_pert = Slider(slider_axes[1], "Perturbacion (\u03F4p)", -15.0, 15.0, valinit=defaults['t_pert'], valstep=0.5)
-rsld_temp_ctrl = RangeSlider(slider_axes[2], "Rango", 0, 30, valinit=(defaults['t_low'], defaults['t_high']))
+rsld_temp_ctrl = RangeSlider(slider_axes[2], "Umbrales", 0, 30, valinit=(defaults['t_low'], defaults['t_high']))
 check_actu = CheckButtons(slider_axes[3], ["Actuadores activos"], actives=[defaults['actuadores_on']])
 
 ax_actu = plt.axes([0.20, 0.01, 0.15, 0.04])
@@ -116,8 +116,8 @@ def update(frame):
     ax_tlow_line.set_ydata([sim.params['t_low'], sim.params['t_low']])
 
     # extender ejes y en cada grafico si fuese necesario
-    low_t  = min(temp, amb, sim.params['t_low'],  sim.params['t_high']) - 1
-    high_t = max(temp, amb, sim.params['t_low'],  sim.params['t_high']) + 1
+    low_t  = min(temp, sim.params['t_low'],  sim.params['t_high']) - 1
+    high_t = max(temp, sim.params['t_low'],  sim.params['t_high']) + 1
     extend_axis(ax_temp, low_t, high_t)
 
     low_p  = pert - 0.5
@@ -136,7 +136,7 @@ def update(frame):
     # actualizar textos de leyendas con valores actuales
     texts_temp = leg_temp.get_texts()
     texts_temp[0].set_text(f"\u03F4o: {temp:.2f} °C")
-    texts_temp[1].set_text(f"\u03F4i: {amb:.2f} °C")
+    texts_temp[1].set_text(f"\u03F4i: {defaults['t_init']:.2f} °C")
 
     texts_pert = leg_pert.get_texts()
     texts_pert[0].set_text(f"\u03F4p: {pert:.2f} °C")
@@ -152,9 +152,9 @@ is_running = [True] # permite que se pueda modificar este valor dentro de las fu
 ani = FuncAnimation(fig, update, interval=33.33, blit=False, cache_frame_data=False)
 
 # Eventos de interfaz grafica
-def on_t_amb(event):
-    sim.params['t_amb'] = sld_t_amb.val
-sld_t_amb.on_changed(on_t_amb)
+def on_t_init(event):
+    sim.params['t_init'] = sld_t_init.val
+sld_t_init.on_changed(on_t_init)
 
 def on_t_pert(event):
     sim.params['t_pert'] = sld_t_pert.val
@@ -170,7 +170,7 @@ def on_check_actu(event):
 check_actu.on_clicked(on_check_actu)
 
 def on_defaults(event):
-    sld_t_amb.reset()
+    sld_t_init.reset()
     sld_t_pert.reset()
     rsld_temp_ctrl.reset()
     check_actu.set_active(0, True)

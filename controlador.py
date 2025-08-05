@@ -14,18 +14,18 @@ class ThermostatSim:
         self.perts = []
         self.states = []
         # initial system temperature equals input param
-        self.current_temp = self.params['t_amb']
+        self.current_temp = self.params['t_init']
         self.heater_on   = False
         self.cooler_on   = False
 
     def step(self):
         """Advance simulation by one second, update internals, return new data."""
         p = self.params
-        amb = p['t_amb'] + p['t_pert']
+        amb = p['t_init']
 
-        # passive exchange
-        error = amb - self.current_temp
-        infl = (amb - self.current_temp) * p['coef_amb']
+        # perturbation passive exchange
+        error = self._error()
+        infl = p['t_pert'] * p['coef_pert']
         infl = np.clip(infl, -p['delta_max'], p['delta_max'])
         self.current_temp += infl
 
@@ -50,6 +50,7 @@ class ThermostatSim:
         self.temps.append(self.current_temp)
         self.states.append(state[0])
         self.t += 1
+        
         return self.t, self.current_temp, amb, p['t_pert'], error, state[0]
 
     def _deltaT(self, power):
@@ -62,3 +63,11 @@ class ThermostatSim:
         if temp > self.params['t_high']:
             return ("REFRIGERADOR", False, True)
         return ("OFF", False, False)
+
+    def _error(self):
+        return self.current_temp - self.params['t_init']
+        # if self.current_temp < self.params['t_low']:
+        #     return self.current_temp - self.params['t_low']
+        # if self.current_temp > self.params['t_high']:
+        #     return self.current_temp - self.params['t_high']
+        # return 0
